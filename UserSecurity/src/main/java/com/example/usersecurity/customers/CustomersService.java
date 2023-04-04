@@ -2,6 +2,10 @@ package com.example.usersecurity.customers;
 
 import com.example.usersecurity.DTO.CustomersDto;
 import com.example.usersecurity.mapper.CustomersMapper;
+//import com.example.usersecurity.models.Orders;
+import com.example.usersecurity.models.Orders;
+import com.example.usersecurity.models.OrdersDetails;
+import com.example.usersecurity.repository.OrdersDetailsRepo;
 import com.example.usersecurity.specifications.CustomerSpecificationBuilder;
 import com.example.usersecurity.specifications.CustomerSpecifications;
 import lombok.RequiredArgsConstructor;
@@ -10,9 +14,8 @@ import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import javax.persistence.EntityNotFoundException;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor(onConstructor = @__({@Autowired}))
@@ -21,7 +24,8 @@ public class CustomersService {
     private final CustomersRepository customersRepository;
 
     private final CustomersMapper customersMapper;
-    private final CustomerSpecificationBuilder customerSpecificationBuilder;
+
+    private final OrdersDetailsRepo ordersDetailsRepository;
 
     public void save(CustomersDto customersDto){
         customersDto.setStatus(true);
@@ -109,5 +113,73 @@ public class CustomersService {
         List<CustomersDto> customersDtos = customersMapper.modelstoDtos(customersPage.getContent());
         return new PageImpl<>(customersDtos, customersPage.getPageable(), customersPage.getTotalElements());
     }
+
+    public void addOrderToCustomerOrder(Long customerId, Orders order) {
+        Customers customer = customersRepository.findById(customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid customer ID"));
+
+        order.setCustomer(customer); // Set the customer object in the order object
+        customer.getOrders().add(order);
+
+        customersRepository.save(customer);
+    }
+
+
+//    public void addOrderToCustomer(Long customerId, Long customerid1, OrdersDetails order) {
+//        Customers customer = customersRepository.findById(customerId)
+//                .orElseThrow(() -> new IllegalArgumentException("Invalid customer ID"));
+//        Customers customer1 = customersRepository.findById(customerid1)
+//                .orElseThrow(() -> new IllegalArgumentException("Invalid customer ID"));
+//
+//        List<Customers> customers = new ArrayList<>();
+//        customers.add(customer);
+//        customers.add(customer1);
+//
+//        order.setCustomersdetails(customers); // set customers in order
+//        customer.getOrdersDetails().add(order); // add order to first customer
+//        customer1.getOrdersDetails().add(order); // add order to second customer
+//
+//        customersRepository.save(customer); // save first customer and associated orders
+//        customersRepository.save(customer1); // save second customer and associated orders
+//    }
+
+    public void addOrderToCustomer(OrdersDetails order) {
+        List<Customers> existingCustomers = new ArrayList<>();
+
+        // Load existing customers from the database
+        for (Customers customer : order.getCustomersdetails()) {
+            Customers existingCustomer = customersRepository.findById(customer.getId())
+                    .orElseThrow(() -> new EntityNotFoundException("Customer not found"));
+            existingCustomers.add(existingCustomer);
+        }
+
+        // Set the existing customers in the order
+        order.setCustomersdetails(existingCustomers);
+
+        // Update the customers with the new order
+        for (Customers customer : existingCustomers) {
+            customer.getOrderDetails().add(order);
+            customersRepository.save(customer);
+        }
+
+        // Save the order
+        ordersDetailsRepository.save(order);
+    }
+
+
+
+
+//    OrdersDetails order1 = ordersDetailsRepository.findById(2L).orElse(null);
+//    List<Customers> customerList = order1.getCustomersdetails();
+//            for (Customers customer : customerList) {
+//        System.out.println("Customer ID: " + customer.getId());
+//        System.out.println("Customer Name: " + customer.getFirstName() + " " + customer.getLastName());
+//        System.out.println("Customer Email: " + customer.getCustomerEmail());
+//        System.out.println("Customer Phone: " + customer.getCustomerPhone());
+//        System.out.println("Customer Address: " + customer.getCustomerAddress());
+//        System.out.println("Customer Status: " + customer.getStatus());
+//    }
+
+
 
 }
