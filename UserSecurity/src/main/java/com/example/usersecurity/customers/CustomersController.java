@@ -2,7 +2,6 @@ package com.example.usersecurity.customers;
 
 import com.example.usersecurity.DTO.CustomersDto;
 import com.example.usersecurity.Upload;
-import com.example.usersecurity.models.CustomersOrdersDetails;
 import com.example.usersecurity.models.Orders;
 import com.example.usersecurity.models.OrdersDetails;
 import com.example.usersecurity.repository.OrdersDetailsCustomer;
@@ -10,13 +9,11 @@ import com.example.usersecurity.repository.OrdersDetailsRepo;
 import com.example.usersecurity.repository.UploadRepo;
 import com.example.usersecurity.service.FileUploadSerive;
 import com.example.usersecurity.specifications.CustomerSpecifications;
-import javassist.bytecode.ByteArray;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,10 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/customers")
@@ -40,14 +34,9 @@ public class CustomersController {
 
     @Autowired
     public FileUploadSerive fileUploadSerive;
+
     @Autowired
     public OrdersDetailsRepo ordersDetailsRepo;
-    private final CustomersRepository customersRepository;
-
-
-    private final OrdersDetailsCustomer ordersDetailsCustomer;
-
-    private final UploadRepo uploadRepo;
 
     @GetMapping
     public List<CustomersDto> getAllCustomer(){
@@ -133,7 +122,7 @@ public class CustomersController {
 
     @GetMapping("/uploads")
     public List<Upload> showAll(){
-        return uploadRepo.findAll();
+        return customersService.showAll();
     }
 
     @DeleteMapping ("/upload/delete/{id}")
@@ -153,53 +142,16 @@ public class CustomersController {
 
     @PostMapping("/join/direct")
     public void joins(@RequestBody OrdersDetails orders){
-        for (Customers customer : orders.getCustomersdetails()) {
-            customersRepository.save(customer);
-        }
-        ordersDetailsRepo.save(orders);
+        customersService.joins(orders);
     }
 
     @PostMapping("/join/dire")
     public void joinDirect(@RequestBody OrdersDetails ordersDetails) {
-        ordersDetailsRepo.save(ordersDetails);
-        for (Customers customer : ordersDetails.getCustomersdetails()) {
-            Optional<Customers> existingCustomer = customersRepository.findById(customer.getId());
-            if(existingCustomer.empty().isEmpty()){
-                customersRepository.save(customer);
-            }
-            CustomersOrdersDetails customersOrdersDetails = new CustomersOrdersDetails();
-            customersOrdersDetails.setCustomer(customer);
-            customersOrdersDetails.setOrderDetails(ordersDetails);
-            ordersDetailsCustomer.save(customersOrdersDetails);
-        }
+        customersService.joinDirect(ordersDetails);
     }
 
     @PostMapping("/join/{id}/{id1}")
     public void join(@RequestBody OrdersDetails ordersDetails, @PathVariable("id") Long id, @PathVariable("id1") Long id1){
-
-        Optional<OrdersDetails> existingOrderDetails = ordersDetailsRepo.findByOrderLineNumber(ordersDetails.getOrderLineNumber());
-
-        if(existingOrderDetails.isPresent()){
-            ordersDetails = existingOrderDetails.get();
-        } else {
-            ordersDetailsRepo.save(ordersDetails);
-        }
-
-        Customers customers = customersRepository.findById(id).orElseThrow();
-        Customers customers1 = customersRepository.findById(id1).orElseThrow();
-
-        ArrayList<Customers> customersArrayList = new ArrayList<>(Arrays.asList(customers, customers1));
-        for (Customers customer : customersArrayList) {
-            Optional<CustomersOrdersDetails> existingJoinEntry = ordersDetailsCustomer.findByCustomerAndOrderDetails(customer,ordersDetails);
-
-            if(existingJoinEntry.isEmpty()){
-                CustomersOrdersDetails customersOrdersDetails = new CustomersOrdersDetails();
-                customersOrdersDetails.setCustomer(customer);
-                customersOrdersDetails.setOrderDetails(ordersDetails);
-                ordersDetailsCustomer.save(customersOrdersDetails);
-            }
-        }
+        customersService.join(ordersDetails,id,id1);
     }
-
-
 }

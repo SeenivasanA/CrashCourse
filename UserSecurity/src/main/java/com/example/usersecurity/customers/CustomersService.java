@@ -1,13 +1,15 @@
 package com.example.usersecurity.customers;
 
 import com.example.usersecurity.DTO.CustomersDto;
+import com.example.usersecurity.Upload;
 import com.example.usersecurity.mapper.CustomersMapper;
-//import com.example.usersecurity.models.Orders;
+import com.example.usersecurity.models.CustomersOrdersDetails;
 import com.example.usersecurity.models.Orders;
 import com.example.usersecurity.models.OrdersDetails;
+import com.example.usersecurity.repository.OrdersDetailsCustomer;
 import com.example.usersecurity.repository.OrdersDetailsRepo;
+import com.example.usersecurity.repository.UploadRepo;
 import com.example.usersecurity.specifications.CustomerSpecificationBuilder;
-import com.example.usersecurity.specifications.CustomerSpecifications;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
@@ -26,6 +28,12 @@ public class CustomersService {
     private final CustomersMapper customersMapper;
 
     private final OrdersDetailsRepo ordersDetailsRepository;
+
+    private final UploadRepo uploadRepo;
+
+    private final OrdersDetailsRepo ordersDetailsRepo;
+
+    private final OrdersDetailsCustomer ordersDetailsCustomer;
 
     public void save(CustomersDto customersDto){
         customersDto.setStatus(true);
@@ -124,25 +132,6 @@ public class CustomersService {
         customersRepository.save(customer);
     }
 
-
-//    public void addOrderToCustomer(Long customerId, Long customerid1, OrdersDetails order) {
-//        Customers customer = customersRepository.findById(customerId)
-//                .orElseThrow(() -> new IllegalArgumentException("Invalid customer ID"));
-//        Customers customer1 = customersRepository.findById(customerid1)
-//                .orElseThrow(() -> new IllegalArgumentException("Invalid customer ID"));
-//
-//        List<Customers> customers = new ArrayList<>();
-//        customers.add(customer);
-//        customers.add(customer1);
-//
-//        order.setCustomersdetails(customers); // set customers in order
-//        customer.getOrdersDetails().add(order); // add order to first customer
-//        customer1.getOrdersDetails().add(order); // add order to second customer
-//
-//        customersRepository.save(customer); // save first customer and associated orders
-//        customersRepository.save(customer1); // save second customer and associated orders
-//    }
-
     public void addOrderToCustomer(OrdersDetails order) {
         List<Customers> existingCustomers = new ArrayList<>();
 
@@ -166,20 +155,55 @@ public class CustomersService {
         ordersDetailsRepository.save(order);
     }
 
+    public List<Upload> showAll(){
+        return uploadRepo.findAll();
+    }
 
+    public void joins(OrdersDetails orders){
+        for (Customers customer : orders.getCustomersdetails()) {
+            customersRepository.save(customer);
+        }
+        ordersDetailsRepo.save(orders);
+    }
 
+    public void joinDirect(OrdersDetails ordersDetails) {
+        ordersDetailsRepo.save(ordersDetails);
+        for (Customers customer : ordersDetails.getCustomersdetails()) {
+            Optional<Customers> existingCustomer = customersRepository.findById(customer.getId());
+            if(existingCustomer.empty().isEmpty()){
+                customersRepository.save(customer);
+            }
+            CustomersOrdersDetails customersOrdersDetails = new CustomersOrdersDetails();
+            customersOrdersDetails.setCustomer(customer);
+            customersOrdersDetails.setOrderDetails(ordersDetails);
+            ordersDetailsCustomer.save(customersOrdersDetails);
+        }
+    }
 
-//    OrdersDetails order1 = ordersDetailsRepository.findById(2L).orElse(null);
-//    List<Customers> customerList = order1.getCustomersdetails();
-//            for (Customers customer : customerList) {
-//        System.out.println("Customer ID: " + customer.getId());
-//        System.out.println("Customer Name: " + customer.getFirstName() + " " + customer.getLastName());
-//        System.out.println("Customer Email: " + customer.getCustomerEmail());
-//        System.out.println("Customer Phone: " + customer.getCustomerPhone());
-//        System.out.println("Customer Address: " + customer.getCustomerAddress());
-//        System.out.println("Customer Status: " + customer.getStatus());
-//    }
+    public void join(OrdersDetails ordersDetails, Long id, Long id1){
 
+        Optional<OrdersDetails> existingOrderDetails = ordersDetailsRepo.findByOrderLineNumber(ordersDetails.getOrderLineNumber());
 
+        if(existingOrderDetails.isPresent()){
+            ordersDetails = existingOrderDetails.get();
+        } else {
+            ordersDetailsRepo.save(ordersDetails);
+        }
+
+        Customers customers = customersRepository.findById(id).orElseThrow();
+        Customers customers1 = customersRepository.findById(id1).orElseThrow();
+
+        ArrayList<Customers> customersArrayList = new ArrayList<>(Arrays.asList(customers, customers1));
+        for (Customers customer : customersArrayList) {
+            Optional<CustomersOrdersDetails> existingJoinEntry = ordersDetailsCustomer.findByCustomerAndOrderDetails(customer,ordersDetails);
+
+            if(existingJoinEntry.isEmpty()){
+                CustomersOrdersDetails customersOrdersDetails = new CustomersOrdersDetails();
+                customersOrdersDetails.setCustomer(customer);
+                customersOrdersDetails.setOrderDetails(ordersDetails);
+                ordersDetailsCustomer.save(customersOrdersDetails);
+            }
+        }
+    }
 
 }
